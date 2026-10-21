@@ -106,13 +106,45 @@ calls `pet.add_task()`, and Generate schedule calls `Scheduler(owner).generate_p
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+I have 9 automated tests, all passing with `python -m pytest`.
+
+Logic tests (`tests/test_pawpal.py`):
+- `mark_complete()` changes a task's status from not done to done.
+- `add_task()` increases a pet's task count.
+- The scheduler pulls tasks from every pet through `Owner.get_all_tasks()`, not just one pet.
+- When time runs out, the scheduler keeps the high-priority task and skips the low-priority one.
+
+UI tests (`tests/test_app.py`, using Streamlit's AppTest to click through the app):
+- Adding a pet creates a real `Pet` object that's still there after the app reruns.
+- Adding the same pet name twice shows an error instead of creating a duplicate.
+- A task goes to the pet I selected, not a different one.
+- An invalid time like "8am" shows an error instead of crashing the app.
+- Generating a schedule with a 40-minute budget shows the planned tasks, a skipped task,
+  and an overlap warning.
+
+These tests matter because they cover the core promises of the app: the right tasks get
+scheduled, the most important ones win when time is short, multiple pets work together, and
+data entered in the browser actually reaches my classes and stays there. I also checked the
+terminal output of `main.py` by hand to confirm the plan used 80 of 90 minutes.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+I'm fairly confident in the main flow: picking tasks by priority within the time budget,
+placing fixed-time tasks, and filling flexible ones into free gaps all work and are tested.
+I'm less confident about edge cases. While writing this, I tried a few by hand and found two
+real problems:
+
+- `detect_conflicts()` only compares tasks that are next to each other after sorting. With a
+  60-minute walk at 08:00, meds at 08:10, and feeding at 08:20, it reports the walk/meds
+  overlap but misses that feeding also overlaps the walk.
+- Times aren't capped at midnight. A 60-minute task starting at 23:30 shows as ending at "24:30".
+
+If I had more time, I'd fix those and test:
+- an owner with no pets, or pets with no tasks (empty plan)
+- an available time of 0 minutes
+- two tasks with the same title (`remove_task` only removes the first one)
+- a fixed-time task that is earlier than the owner's day start
+- marking a task complete and confirming it disappears from the next plan
 
 ---
 
