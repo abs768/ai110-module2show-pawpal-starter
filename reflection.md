@@ -66,6 +66,13 @@ draft pytest tests, and update the README. It suggested a two-step plan: choose 
 within the time budget, then place fixed-time tasks first and fill flexible ones into free gaps.
 It also suggested a table-style layout for the terminal schedule.
 
+
+For the Streamlit UI, I asked Codex how to keep my Owner object from being recreated every time
+Streamlit reruns the script. It explained `st.session_state` and suggested checking
+`if "owner" not in st.session_state` before creating the Owner, then reusing it on later reruns.
+I then had it wire the buttons to my existing methods: Add pet calls `owner.add_pet()`, Add task
+calls `pet.add_task()`, and Generate schedule calls `Scheduler(owner).generate_plan()`.
+
 **b. Judgment and verification**
 
 - **Accepted:** Using owner.get_all_tasks() and the Pet from each (pet, task) pair for pet_name.
@@ -84,6 +91,14 @@ It also suggested a table-style layout for the terminal schedule.
   dataclass. My demo still worked because it used keyword arguments, but a verification script that
   passed priority positionally sorted everything as "medium." I checked the field order with
   `dataclasses.fields(Task)` and had Codex restore the original order from my skeleton.
+- **Accepted (UI):** The session state pattern, because it keeps one Owner for the whole session
+  and the UI only calls methods from `pawpal_system.py` instead of duplicating scheduling logic.
+- **Limitation:** Session state only lasts for the browser session. If I reload the page, my pets
+  and tasks are gone. That's fine for this project, but saving to a JSON file would be the next step.
+- **Verified (UI):** I ran `streamlit run app.py`, added two pets and some tasks, and generated a
+  schedule. Adding the same pet name twice showed an error, and a bad time like "8am" was rejected.
+  When I set a 40-minute budget, Fetch was skipped and the app warned that the 08:00 walk overlaps
+  the 08:10 meds.
 
 ---
 
