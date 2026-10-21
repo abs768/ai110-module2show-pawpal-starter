@@ -290,3 +290,7 @@ what made AI help safe to use.
   plan with my existing tests without the implementation discussion in the way, and it gave me a clean record of
   what I asked for in each phase. When I forgot to update `AGENTS.md` between phases, the old phase rules piled up
   and contradicted each other, which showed me how much the AI depends on the context I give it.
+
+- **A second AI as reviewer:** I also used Claude as an independent reviewer. I had it build and test a reference
+  solution for each phase before giving Codex the prompts, and used it to check Codex's output (field order, edge
+  cases, UML rendering). Using two tools meant one could check the other, but I still made the final calls on design.
