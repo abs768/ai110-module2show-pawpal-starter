@@ -1,15 +1,74 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
-
-    class ClassName {
-        +type attribute
-        +method() returnType
+%% PawPal+ final design (matches pawpal_system.py)
+%% list~tuple~ means (Pet, Task) pairs; Scheduler.skipped holds (Pet, Task, reason) entries.
+%% Scheduler(owner, day=None): day defaults to today; only tasks due on or before day are planned.
+    class Owner {
+        name: str
+        available_minutes: int
+        day_start: str
+        preferences: list~str~
+        pets: list~Pet~
+        +add_pet(pet: Pet) None
+        +remove_pet(name: str) None
+        +get_pet(name: str) Pet | None
+        +get_all_tasks(include_completed: bool = False) list~tuple~
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        name: str
+        species: str
+        breed: str
+        age: int
+        tasks: list~Task~
+        +add_task(task: Task) None
+        +remove_task(title: str) None
+        +get_pending_tasks() list~Task~
     }
 
-    ClassName --> AnotherClass : relationship
+    class Task {
+        title: str
+        duration_minutes: int
+        priority: str
+        category: str
+        preferred_time: str | None
+        frequency: str
+        completed: bool
+        due_date: date
+        +mark_complete() None
+        +priority_rank() int
+        +next_occurrence() Task | None
+    }
+
+    class ScheduledTask {
+        task: Task
+        pet_name: str
+        start_time: str
+        end_time: str
+        reason: str
+    }
+
+    class Scheduler {
+        owner: Owner
+        day: date
+        skipped: list~tuple~
+        +generate_plan() list~ScheduledTask~
+        +sort_tasks(tasks: list~Task~) list~Task~
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +filter_tasks(pet_name: str | None, completed: bool | None) list~tuple~
+        +fits_in_time(task: Task, minutes_left: int) bool
+        +mark_task_complete(pet: Pet, task: Task) Task | None
+        +detect_conflicts(plan: list~ScheduledTask~) list~str~
+        +explain_plan(plan: list~ScheduledTask~) str
+        -_sort_key(task) tuple
+        -_make_slot(pet, task, start, placement) ScheduledTask
+        -_earliest_free_start(plan, duration) int
+    }
+
+    Owner "1" --> "0..*" Pet : has
+    Pet "1" --> "0..*" Task : cares for
+    Scheduler "1" --> "1" Owner : plans for, via get_all_tasks()
+    Scheduler ..> ScheduledTask : creates
+    Scheduler ..> Pet : mark_task_complete() adds next copy
+    Scheduler ..> Task : completes, asks for next_occurrence()
+    ScheduledTask --> Task : wraps
+    Task ..> Task : next_occurrence() copies

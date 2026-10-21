@@ -27,6 +27,11 @@ I asked the AI to review my skeleton for missing relationships and bottlenecks.
 - **Corrected the AI:** It said string priorities sort with “low” first. I tested `sorted(['low', 'medium', 'high'])` and got `['high', 'low', 'medium']`. The example was wrong, but the point still held, which is why I use PRIORITY_RANKS and `priority_rank()` instead of sorting strings.
 - **Noted for later:** times are strings and will need conversion, `remove_task` assumes unique titles, and Owner.preferences isn't used by any method yet.
 
+Comparing `diagrams/uml_draft.mmd` with `diagrams/uml_final.mmd` shows how the design grew during the build. The
+same five classes survived from Phase 1, but I added recurrence (`due_date`, `next_occurrence()`), filtering
+(`filter_tasks()`, `get_all_tasks(include_completed)`), a planning `day` on the Scheduler, and a new
+Scheduler → Pet interaction for adding the next copy of a recurring task.
+
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
@@ -89,6 +94,11 @@ edge cases to test for a pet scheduler with sorting and recurring tasks?" It map
 existing tests already covered and listed the gaps. I then had it draft edge-case tests, and when one
 failed, I asked it whether the bug was in my test code or my `pawpal_system.py` logic.
 
+For the final polish, I used one more new chat. I asked Codex how conflict warnings should be presented in the UI
+and which Scheduler methods `app.py` wasn't using yet, then had it update the UI to show sorting, filtering, and
+recurring tasks. I attached `pawpal_system.py` and asked what my Phase 1 UML was missing, saved the final diagram as
+`diagrams/uml_final.mmd`, and had it draft a Features list for the README, which I checked against the code.
+
 **b. Judgment and verification**
 
 - **Accepted:** Using owner.get_all_tasks() and the Pet from each (pet, task) pair for pet_name.
@@ -142,13 +152,38 @@ failed, I asked it whether the bug was in my test code or my `pawpal_system.py` 
   (`to_minutes` would raise), but my UI already rejects bad times before they reach the scheduler, and
   `test_bad_time_is_rejected_without_crashing` covers that, so I left it as a next step.
 
+- **UI review (Phase 6):** Codex correctly found that `app.py` wasn't using `sort_by_time()`, `filter_tasks()`, or
+  `mark_task_complete()`. It recommended showing each conflict with both tasks, pets, and time ranges, plus a
+  suggestion to move one task. I agreed, but **modified** one part: instead of one warning per conflict, I grouped all
+  conflicts into one warning shown *above* the plan, so three tasks at 09:00 don't flood the page with three boxes
+  and the owner sees what to fix before reading the schedule.
+- **Kept the UI thin (Phase 6):** I told Codex to keep every widget label unchanged, because my UI tests find widgets
+  by label, and to only call existing Scheduler methods, so the UI has no scheduling logic of its own. One
+  Streamlit detail: the "Marked done" message would vanish because `st.rerun()` clears the page, so it's kept in
+  `st.session_state` and shown on the next run.
+- **UML review (Phase 6):** Codex's list of UML updates was accurate, and it caught something I'd missed: a
+  `Scheduler ..> Pet` relationship, because `mark_task_complete()` adds the next copy *to the pet*. Before using its
+  `Pet | None` return-type style, I rendered a test diagram to make sure Mermaid shows `|` correctly. I kept the
+  private helpers but shortened their parameter lists, because a long signature overlapped other text when rendered.
+  When Codex wrote `uml_final.mmd`, the content matched my code, but rendering it showed three display bugs:
+  nested types like `list~tuple~Pet, Task~~` came out garbled, `__init__` rendered as a bold "init" (Mermaid reads
+  `__` as markdown), and `_make_slot` overlapped the line above. I switched to `list~tuple~` with `%%` comments
+  explaining the pairs, moved the constructor note into a comment, and shortened the helper signatures. The
+  lesson: a diagram that's *correct* still has to be *checked visually*.
+- **Features list (Phase 6):** Codex's draft named the right method for each feature and added `valid_time()` for
+  input validation, which I'd described too vaguely. It left out that fixed-time tasks keep their exact time and
+  that completing a task twice doesn't duplicate it, so I added those back.
+- **Verified (Phase 6):** `python -m pytest` gave 38 passed (8 UI + 30 logic). I also ran through the README's
+  example workflow in the app to confirm the numbers it describes (35 of 40 minutes, Fetch skipped with 5 minutes
+  left, one conflict warning).
+
 ---
 
 ## 4. Testing and Verification
 
 **a. What you tested**
 
-I have 35 automated tests, all passing with `python -m pytest`.
+I have 38 automated tests, all passing with `python -m pytest`.
 
 Logic tests (`tests/test_pawpal.py`, 30 tests):
 - **Core:** `mark_complete()` changes a task's status, `add_task()` increases a pet's task count, and the
@@ -167,13 +202,16 @@ Logic tests (`tests/test_pawpal.py`, 30 tests):
 - **Edge cases:** an owner with no pets and a pet with no tasks both give an empty plan without errors;
   tasks that would run past midnight are skipped; flexible tasks fill the gap before a fixed task.
 
-UI tests (`tests/test_app.py`, 5 tests using Streamlit's AppTest to click through the app):
+UI tests (`tests/test_app.py`, 8 tests using Streamlit's AppTest to click through the app):
 - Adding a pet creates a real `Pet` object that's still there after the app reruns.
 - Adding the same pet name twice shows an error instead of creating a duplicate.
 - A task goes to the pet I selected, not a different one.
 - An invalid time like "8am" shows an error instead of crashing the app.
 - Generating a schedule with a 40-minute budget shows the planned tasks, a skipped task,
   and an overlap warning.
+- The task list is sorted by time and can be filtered by pet (added in Phase 6).
+- Clicking **Mark complete** on a daily task creates tomorrow's copy and shows when it's due (Phase 6).
+- A schedule with no overlaps shows a "No time conflicts" message instead of a warning (Phase 6).
 
 These tests matter because they cover the core promises of the app: the right tasks get
 scheduled, the most important ones win when time is short, multiple pets work together, recurring
@@ -196,7 +234,7 @@ I'm not at 5/5 because a few behaviors are untested or intentionally simple. If 
 - a fixed-time task earlier than the owner's day start (currently allowed: meds at 07:00 still go at 07:00)
 - two tasks with the same title (`remove_task` only removes the first one)
 - invalid time strings passed straight to the scheduler (the UI blocks them, but `to_minutes` would raise)
-- marking a task complete from the Streamlit UI
+- editing or deleting a task from the Streamlit UI (not built yet)
 
 ---
 
@@ -204,12 +242,51 @@ I'm not at 5/5 because a few behaviors are untested or intentionally simple. If 
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with how cleanly the logic and the UI are separated. All the scheduling rules live in
+`pawpal_system.py`, and both `main.py` and the Streamlit app only call those methods. That paid off over and over:
+when I added sorting, filtering, and recurring tasks in Phase 4, the UI needed no logic of its own in Phase 6, just
+calls to `sort_by_time()`, `filter_tasks()`, and `mark_task_complete()`. I'm also proud of the test suite. It
+grew from 4 tests to 38, it covers both the logic and the UI, and it caught real bugs along the way (missed
+overlaps, times past midnight, and duplicate copies when completing a task twice).
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+- **Save data between sessions.** Everything lives in `st.session_state`, so a page reload wipes it. I'd save the
+  Owner to a JSON file.
+- **Use owner preferences.** `Owner.preferences` has been in the design since Phase 1, but no method uses it. I'd
+  let it influence placement, for example "walks in the morning".
+- **Smarter conflict handling.** Right now conflicts are only warnings. I'd offer to move a flexible task, and
+  warn when a fixed-time task is earlier than the owner's day start.
+- **Editing and removing tasks in the UI.** The README scenario mentions add/edit; the app only adds and
+  completes tasks.
+- **Unique task IDs.** Titles aren't unique, so `remove_task(title)` only removes the first match.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+The most important thing I learned is that with a powerful AI tool, my job shifts from writing every line to being
+the **lead architect**: I decide what the system is, and the AI helps build it inside those boundaries. The AI was
+fast and usually right, but "usually" isn't enough. It silently reordered dataclass fields, gave a wrong example
+of how strings sort, suggested a fix (`ScheduledTask.pet_name`) that didn't solve the real problem, reported tests
+as done without running them, and wrote a test plan that missed the one case that exposed a bug. Every one of those
+was caught because I had a clear design to compare against and I verified results myself: running the code,
+running the tests, and checking the README against the actual code. Good design plus independent verification is
+what made AI help safe to use.
+
+**AI strategy**
+
+- **Most effective features:** agent mode for multi-file changes (it updated `pawpal_system.py`, `main.py`, and the
+  tests together and ran them); the chat for "explain only, don't edit yet" questions, like how `st.session_state`
+  works or which strategy to use for conflict detection; and an `AGENTS.md` file with standing rules (only call
+  existing methods from the UI, keep new dataclass fields at the end, never edit a test just to make it pass,
+  Python 3.9). The rules file did the most to keep Codex consistent from phase to phase.
+- **A suggestion I modified or rejected:** In Phase 4, Codex suggested value-based task selection, which is
+  essentially a knapsack algorithm, to fit more tasks into the time budget. I rejected it: it's harder to explain
+  to a pet owner, and my design deliberately uses a greedy priority rule so essential care always comes first.
+  I also changed its recurring-task idea from "expand tasks into each planning day" to the simpler "create the
+  next occurrence when a task is completed". Both choices kept the design small and easy to explain.
+- **Separate chat sessions:** I used a new chat for each phase (design, implementation, UI, algorithms, testing,
+  polish). Each chat only held the context for that phase, so Codex didn't mix old instructions into new work,
+  for example it didn't keep writing stubs after the skeleton phase. It also made it easy to compare its test
+  plan with my existing tests without the implementation discussion in the way, and it gave me a clean record of
+  what I asked for in each phase. When I forgot to update `AGENTS.md` between phases, the old phase rules piled up
+  and contradicted each other, which showed me how much the AI depends on the context I give it.

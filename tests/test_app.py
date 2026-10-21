@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import timedelta
 
 from streamlit.testing.v1 import AppTest
 
@@ -106,3 +107,47 @@ def test_generate_schedule_skips_and_warns():
     )
     for expected in ("Morning walk", "Give meds", "Skipped", "Fetch", "overlaps"):
         assert expected in rendered
+
+
+def test_task_list_is_sorted_by_time_and_filtered():
+    """Check task list ordering and pet filtering in the Streamlit UI."""
+    at = start_app()
+    add_pet(at, "Biscuit")
+    add_pet(at, "Mochi", "cat")
+    add_task(at, "Biscuit", "Dinner", 10, "medium", "18:00")
+    add_task(at, "Mochi", "Meds", 5, "high", "09:00")
+    add_task(at, "Biscuit", "Walk", 30, "high", "07:30")
+
+    assert list(at.table[-1].value["Task"]) == ["Walk", "Meds", "Dinner"]
+
+    widget(at, "selectbox", "Show tasks for").set_value("Biscuit")
+    at.run()
+
+    assert list(at.table[-1].value["Task"]) == ["Walk", "Dinner"]
+
+
+def test_mark_complete_creates_next_occurrence():
+    """Check completing a task creates a pending daily occurrence."""
+    at = start_app()
+    add_pet(at, "Biscuit")
+    add_task(at, "Biscuit", "Walk", 30, "high")
+    today = at.session_state.owner.get_pet("Biscuit").tasks[0].due_date
+
+    click(at, "Mark complete")
+
+    tasks = at.session_state.owner.get_pet("Biscuit").tasks
+    assert [task.completed for task in tasks] == [True, False]
+    assert tasks[1].due_date == today + timedelta(days=1)
+    assert any("Next one (daily) is due" in str(message.value) for message in at.success)
+
+
+def test_schedule_without_conflicts_says_so():
+    """Show a success message and no warning for a conflict-free schedule."""
+    at = start_app()
+    add_pet(at, "Biscuit")
+    add_task(at, "Biscuit", "Walk", 30, "high")
+
+    click(at, "Generate schedule")
+
+    assert any("No time conflicts" in str(message.value) for message in at.success)
+    assert len(at.warning) == 0
