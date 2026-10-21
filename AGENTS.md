@@ -16,6 +16,14 @@ Streamlit app that helps a pet owner plan daily pet care tasks. Logic lives in p
 - Scheduler must read tasks via Owner.get_all_tasks() (multi-pet), never from a single pet.
 - No new third-party dependencies besides pytest. Do not modify app.py yet.
 
+## Current phase: Phase 3 — UI integration
+- Edit app.py only (pawpal_system.py stays as is unless I ask).
+- Store the Owner in st.session_state["owner"]; create it only if it isn't there yet.
+- UI actions must call existing methods: Owner.add_pet, Owner.get_pet, Pet.add_task, Scheduler.generate_plan,
+  Scheduler.detect_conflicts, Scheduler.explain_plan. Don't duplicate scheduling logic in the UI.
+
+
+
 ## Style
 - Python 3.10+, type hints, `from __future__ import annotations`.
 - Keep it simple; explain any suggestion that adds complexity before doing it.
