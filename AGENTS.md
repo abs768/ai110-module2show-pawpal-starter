@@ -10,6 +10,12 @@ Streamlit app that helps a pet owner plan daily pet care tasks. Logic lives in p
 - Method bodies must be `pass` with a one-line docstring. No scheduling logic yet.
 - Do not modify app.py, README.md, or requirements.txt.
 
+## Current phase: Phase 2 — Implementation
+- Implement method logic in pawpal_system.py. Keep the existing classes and signatures from the UML.
+- Allowed files: pawpal_system.py, main.py, tests/test_pawpal.py, README.md, reflection.md.
+- Scheduler must read tasks via Owner.get_all_tasks() (multi-pet), never from a single pet.
+- No new third-party dependencies besides pytest. Do not modify app.py yet.
+
 ## Style
 - Python 3.10+, type hints, `from __future__ import annotations`.
 - Keep it simple; explain any suggestion that adds complexity before doing it.

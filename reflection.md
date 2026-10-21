@@ -33,13 +33,25 @@ I asked the AI to review my skeleton for missing relationships and bottlenecks.
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+My scheduler considers three constraints: the owner's available minutes for the day, each task's
+priority (high, medium, low), and an optional preferred time (like meds at 09:00). It also only
+schedules pending tasks, so anything already marked complete is left out.
+
+I decided priority matters most because missing meds or feeding is worse than missing playtime.
+Time budget comes second: the scheduler picks tasks in priority order until the minutes run out.
+Preferred time comes third. It decides *where* a task goes in the day, not *whether* it gets in.
+Ties are broken by earlier preferred time, then shorter duration, so more tasks can fit.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+My scheduler is greedy: it takes the most important tasks first and never goes back to rearrange.
+That means a long high-priority task can use up time that could have fit two shorter low-priority
+tasks. In my demo, "Puzzle feeder" (25 min, low) was skipped because only 10 minutes were left.
+
+I think that's reasonable for a busy pet owner. It's more important that the essential care always
+happens than that the most total tasks fit, and a greedy approach is simple to explain. The plan
+tells the owner exactly which task was skipped and why. Owner preferences are stored but not used
+yet, which I'd add next.
 
 ---
 
@@ -47,13 +59,31 @@ I asked the AI to review my skeleton for missing relationships and bottlenecks.
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used Codex in VS Code in agent mode, with an AGENTS.md file that told it which files it could edit
+and that the Scheduler must read from Owner.get_all_tasks(). Before implementing, I asked it how the
+Scheduler should get tasks from the Owner's pets. Then I had it implement the methods, write main.py,
+draft pytest tests, and update the README. It suggested a two-step plan: choose tasks by priority
+within the time budget, then place fixed-time tasks first and fill flexible ones into free gaps.
+It also suggested a table-style layout for the terminal schedule.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+- **Accepted:** Using owner.get_all_tasks() and the Pet from each (pet, task) pair for pet_name.
+  This matched the change I made in Phase 1. I also accepted the two-step plan, because placing
+  fixed-time tasks first stops a flexible task from taking a slot like meds at 09:00.
+- **Added myself:** Codex didn't mention that get_all_tasks() only returns pending tasks, so
+  completed tasks are filtered out without the Scheduler checking them.
+- **Changed:** The first output only showed start times. I had it show start–end ranges so it's
+  easy to see that no tasks overlap.
+- **Fixed:** pytest only ran with a PYTHONPATH workaround because it wasn't installed in my venv.
+  I installed it with `python -m pip install pytest` and added it to requirements.txt.
+- **Verified:** I ran main.py and checked by hand that the plan uses 80 of 90 minutes, places
+  fixed-time tasks at their times, and skips the lowest-priority task that doesn't fit. I ran
+  `python -m pytest` and all 4 tests passed, including a multi-pet test and an out-of-time test.
+- **Caught an AI change:** Codex silently swapped the order of `priority` and `category` in the Task
+  dataclass. My demo still worked because it used keyword arguments, but a verification script that
+  passed priority positionally sorted everything as "medium." I checked the field order with
+  `dataclasses.fields(Task)` and had Codex restore the original order from my skeleton.
 
 ---
 

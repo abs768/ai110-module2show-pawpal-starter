@@ -47,11 +47,19 @@ pip install -r requirements.txt
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+Today's Schedule for Sam (90 min available)
+==========================================================
+Time          Pet        Task                      Min Priority
+---------------------------------------------------------------
+07:30-08:00   Biscuit    Morning walk               30 high    
+08:00-08:10   Biscuit    Breakfast                  10 high    
+08:10-08:25   Mochi      Brush coat                 15 medium  
+08:25-08:45   Biscuit    Fetch in the yard          20 low     
+09:00-09:05   Mochi      Give meds                   5 high    
+---------------------------------------------------------------
+Scheduled 5 task(s) using 80 of 90 available minutes.
+Sort rule: (high > medium > low), then preferred time, then shortest first
+Skipped 'Puzzle feeder' for Mochi: needs 25 min, only 10 min left.
 ```
 
 ## 🧪 Testing PawPal+
@@ -67,8 +75,19 @@ pytest --cov
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.3.2, pluggy-1.6.0
+rootdir: /Users/bhavanishankar/ai110-module2show-pawpal-starter
+collected 4 items
+
+tests/test_pawpal.py ....                                                [100%]
+
+============================== 4 passed in 0.00s ===============================
 ```
+
+## Implementation Summary
+
+Task holds one care activity and its details, while each Pet holds that pet's tasks. Owner holds its pets and exposes `get_all_tasks()` as (pet, task) pairs, so Scheduler knows which pet each task belongs to. Scheduler reads tasks through `get_all_tasks()` and picks tasks by priority within the owner's time budget. It places tasks with fixed preferred times first, then fills flexible tasks into the earliest free gaps. It also explains why tasks were skipped and reports conflicts in the plan.
 
 ## 📐 Smarter Scheduling
 
