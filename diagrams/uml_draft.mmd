@@ -1,0 +1,60 @@
+classDiagram
+    class Owner {
+        name: str
+        available_minutes: int
+        day_start: str
+        preferences: list~str~
+        pets: list~Pet~
+        +add_pet(pet)
+        +remove_pet(name)
+        +get_pet(name) Pet
+        +get_all_tasks() list~tuple~
+    }
+
+    class Pet {
+        name
+        species
+        breed
+        age: int
+        tasks: list~Task~
+        +add_task(task)
+        +remove_task(title)
+        +get_pending_tasks() list~Task~
+    }
+
+    class Task {
+        title
+        category
+        duration_minutes: int
+        priority: str
+        preferred_time: str
+        frequency: str
+        completed: bool
+        +mark_complete()
+        +priority_rank() int
+    }
+
+    class ScheduledTask {
+        task: Task
+        pet_name
+        start_time
+        end_time
+        reason
+    }
+
+    class Scheduler {
+        owner: Owner
+        +generate_plan() list~ScheduledTask~
+        +sort_tasks(tasks) list~Task~
+        +fits_in_time(task, minutes_left) bool
+        +detect_conflicts(plan) list~str~
+        +explain_plan(plan) str
+    }
+
+    Owner "1" --> "0..*" Pet : has
+    Pet "1" --> "0..*" Task : needs
+    Scheduler "1" --> "1" Owner : plans for
+    Scheduler ..> ScheduledTask : creates
+    ScheduledTask --> Task : wraps
+
+%% returns (Pet, Task) pairs
