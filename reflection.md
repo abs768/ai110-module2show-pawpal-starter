@@ -151,7 +151,6 @@ recurring tasks. I attached `pawpal_system.py` and asked what my Phase 1 UML was
 - **Skipped (Phase 5):** Codex suggested testing invalid time strings like "8am" in the scheduler. That's true
   (`to_minutes` would raise), but my UI already rejects bad times before they reach the scheduler, and
   `test_bad_time_is_rejected_without_crashing` covers that, so I left it as a next step.
-
 - **UI review (Phase 6):** Codex correctly found that `app.py` wasn't using `sort_by_time()`, `filter_tasks()`, or
   `mark_task_complete()`. It recommended showing each conflict with both tasks, pets, and time ranges, plus a
   suggestion to move one task. I agreed, but **modified** one part: instead of one warning per conflict, I grouped all
@@ -163,13 +162,13 @@ recurring tasks. I attached `pawpal_system.py` and asked what my Phase 1 UML was
   `st.session_state` and shown on the next run.
 - **UML review (Phase 6):** Codex's list of UML updates was accurate, and it caught something I'd missed: a
   `Scheduler ..> Pet` relationship, because `mark_task_complete()` adds the next copy *to the pet*. Before using its
-  `Pet | None` return-type style, I rendered a test diagram to make sure Mermaid shows `|` correctly. I kept the
+  `Pet | None` return-type style, I had Claude render a test diagram to make sure Mermaid shows `|` correctly. I kept the
   private helpers but shortened their parameter lists, because a long signature overlapped other text when rendered.
   When Codex wrote `uml_final.mmd`, the content matched my code, but rendering it showed three display bugs:
   nested types like `list~tuple~Pet, Task~~` came out garbled, `__init__` rendered as a bold "init" (Mermaid reads
-  `__` as markdown), and `_make_slot` overlapped the line above. I switched to `list~tuple~` with `%%` comments
-  explaining the pairs, moved the constructor note into a comment, and shortened the helper signatures. The
-  lesson: a diagram that's *correct* still has to be *checked visually*.
+  `__` as markdown), and `_make_slot` overlapped the line above. I gave Codex exact instructions to fix all three
+  (use `list~tuple~` with `%%` comments, move the constructor note into a comment, shorten the helper signatures)
+  and checked the result in mermaid.live. The lesson: a diagram that's *correct* still has to be *checked visually*.
 - **Features list (Phase 6):** Codex's draft named the right method for each feature and added `valid_time()` for
   input validation, which I'd described too vaguely. It left out that fixed-time tasks keep their exact time and
   that completing a task twice doesn't duplicate it, so I added those back.
@@ -275,7 +274,7 @@ what made AI help safe to use.
 **AI strategy**
 
 - **Most effective features:** agent mode for multi-file changes (it updated `pawpal_system.py`, `main.py`, and the
-  tests together and ran them); the chat for "explain only, don't edit yet" questions, like how `st.session_state`
+  tests together); the chat for "explain only, don't edit yet" questions, like how `st.session_state`
   works or which strategy to use for conflict detection; and an `AGENTS.md` file with standing rules (only call
   existing methods from the UI, keep new dataclass fields at the end, never edit a test just to make it pass,
   Python 3.9). The rules file did the most to keep Codex consistent from phase to phase.
@@ -290,7 +289,6 @@ what made AI help safe to use.
   plan with my existing tests without the implementation discussion in the way, and it gave me a clean record of
   what I asked for in each phase. When I forgot to update `AGENTS.md` between phases, the old phase rules piled up
   and contradicted each other, which showed me how much the AI depends on the context I give it.
-
 - **A second AI as reviewer:** I also used Claude as an independent reviewer. I had it build and test a reference
   solution for each phase before giving Codex the prompts, and used it to check Codex's output (field order, edge
   cases, UML rendering). Using two tools meant one could check the other, but I still made the final calls on design.
