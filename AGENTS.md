@@ -1,0 +1,15 @@
+# AGENTS.md — PawPal+
+
+## Project
+Streamlit app that helps a pet owner plan daily pet care tasks. Logic lives in pawpal_system.py; UI in app.py.
+
+## Current phase: Phase 1 — System design
+- Only create: diagrams/uml_draft.mmd, pawpal_system.py (skeletons), and edit reflection.md section 1.
+- Classes: Owner, Pet, Task, Scheduler, plus helper ScheduledTask. Do NOT add other classes.
+- Use @dataclass for Task, Pet, Owner, ScheduledTask. Use field(default_factory=list) for lists.
+- Method bodies must be `pass` with a one-line docstring. No scheduling logic yet.
+- Do not modify app.py, README.md, or requirements.txt.
+
+## Style
+- Python 3.10+, type hints, `from __future__ import annotations`.
+- Keep it simple; explain any suggestion that adds complexity before doing it.
