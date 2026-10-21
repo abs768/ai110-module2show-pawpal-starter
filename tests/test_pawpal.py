@@ -213,3 +213,175 @@ def test_conflict_between_different_pets_is_labeled() -> None:
 
     assert len(conflicts) == 1
     assert "[different pets]" in conflicts[0]
+
+
+# --- Phase 5: edge cases ---
+
+
+def test_empty_owner_has_empty_plan_conflicts_and_explanation() -> None:
+    """Handle an owner without pets or tasks."""
+    today = date(2026, 10, 21)
+    scheduler = Scheduler(Owner("Sam"), day=today)
+
+    plan = scheduler.generate_plan()
+
+    assert plan == []
+    assert scheduler.detect_conflicts(plan) == []
+    assert "Scheduled 0 task(s)" in scheduler.explain_plan(plan)
+
+
+def test_pet_without_tasks_has_empty_plan() -> None:
+    """Handle a pet without care tasks."""
+    today = date(2026, 10, 21)
+    scheduler = Scheduler(Owner("Sam", pets=[Pet("Biscuit", "dog")]), day=today)
+
+    assert scheduler.generate_plan() == []
+
+
+def test_zero_available_minutes_skips_task() -> None:
+    """Skip a task when no minutes are available."""
+    today = date(2026, 10, 21)
+    pet = Pet("Biscuit", "dog", tasks=[Task("Walk", 10, due_date=today)])
+    scheduler = Scheduler(Owner("Sam", available_minutes=0, pets=[pet]), day=today)
+
+    assert scheduler.generate_plan() == []
+    assert "only 0 min left" in scheduler.skipped[0][2]
+
+
+def test_task_that_exactly_fits_available_minutes_is_scheduled() -> None:
+    """Schedule a task whose duration exactly matches the time budget."""
+    today = date(2026, 10, 21)
+    pet = Pet("Biscuit", "dog", tasks=[Task("Walk", 30, due_date=today)])
+    scheduler = Scheduler(Owner("Sam", available_minutes=30, pets=[pet]), day=today)
+
+    assert [slot.task.title for slot in scheduler.generate_plan()] == ["Walk"]
+
+
+def test_generated_plan_is_chronological() -> None:
+    """Return scheduled tasks in chronological order."""
+    today = date(2026, 10, 21)
+    pet = Pet(
+        "Biscuit",
+        "dog",
+        tasks=[
+            Task("Dinner", 10, priority="high", preferred_time="18:00", due_date=today),
+            Task("Breakfast", 10, priority="low", preferred_time="07:00", due_date=today),
+        ],
+    )
+    scheduler = Scheduler(Owner("Sam", pets=[pet]), day=today)
+
+    assert [slot.task.title for slot in scheduler.generate_plan()] == ["Breakfast", "Dinner"]
+
+
+def test_flexible_tasks_fill_gaps_around_fixed_task() -> None:
+    """Place flexible tasks in the earliest gaps around a fixed task."""
+    today = date(2026, 10, 21)
+    pet = Pet(
+        "Biscuit",
+        "dog",
+        tasks=[
+            Task("Vet", 30, priority="high", preferred_time="08:20", due_date=today),
+            Task("Brush", 15, priority="low", due_date=today),
+            Task("Play", 30, priority="low", due_date=today),
+        ],
+    )
+    scheduler = Scheduler(Owner("Sam", day_start="08:00", pets=[pet]), day=today)
+
+    plan = scheduler.generate_plan()
+
+    assert [(slot.task.title, slot.start_time, slot.end_time) for slot in plan] == [
+        ("Brush", "08:00", "08:15"),
+        ("Vet", "08:20", "08:50"),
+        ("Play", "08:50", "09:20"),
+    ]
+
+
+def test_same_time_tasks_for_different_pets_conflict() -> None:
+    """Report a conflict when different pets have tasks at the same time."""
+    today = date(2026, 10, 21)
+    dog = Pet("Biscuit", "dog", tasks=[Task("Walk", 30, preferred_time="09:00", due_date=today)])
+    cat = Pet("Mochi", "cat", tasks=[Task("Feed", 10, preferred_time="09:00", due_date=today)])
+    scheduler = Scheduler(Owner("Sam", pets=[dog, cat]), day=today)
+
+    conflicts = scheduler.detect_conflicts(scheduler.generate_plan())
+
+    assert len(conflicts) == 1
+    assert "[different pets]" in conflicts[0]
+
+
+def test_three_tasks_at_same_time_produce_three_conflicts() -> None:
+    """Report every pairwise conflict among three simultaneous tasks."""
+    today = date(2026, 10, 21)
+    pet = Pet(
+        "Biscuit",
+        "dog",
+        tasks=[
+            Task("A", 30, preferred_time="09:00", due_date=today),
+            Task("B", 20, preferred_time="09:00", due_date=today),
+            Task("C", 10, preferred_time="09:00", due_date=today),
+        ],
+    )
+
+    scheduler = Scheduler(Owner("Sam", pets=[pet]), day=today)
+    conflicts = scheduler.detect_conflicts(scheduler.generate_plan())
+
+    assert len(conflicts) == 3
+
+
+def test_back_to_back_scheduled_tasks_do_not_conflict() -> None:
+    """Treat tasks that touch at an endpoint as non-overlapping."""
+    plan = [
+        ScheduledTask(Task("Walk", 30), "Biscuit", "08:00", "08:30"),
+        ScheduledTask(Task("Feed", 10), "Biscuit", "08:30", "08:40"),
+    ]
+
+    assert Scheduler(Owner("Sam")).detect_conflicts(plan) == []
+
+
+def test_completing_same_task_twice_does_not_duplicate_occurrence() -> None:
+    """Avoid creating another occurrence when completing a task twice."""
+    today = date(2026, 10, 21)
+    task = Task("Walk", 30, due_date=today)
+    pet = Pet("Biscuit", "dog", tasks=[task])
+    scheduler = Scheduler(Owner("Sam", pets=[pet]), day=today)
+
+    scheduler.mark_task_complete(pet, task)
+    second_result = scheduler.mark_task_complete(pet, task)
+
+    assert second_result is None
+    assert len(pet.tasks) == 2
+
+
+def test_overdue_pending_task_is_still_planned() -> None:
+    """Include pending tasks whose due date is before today."""
+    today = date(2026, 10, 21)
+    pet = Pet(
+        "Biscuit",
+        "dog",
+        tasks=[Task("Walk", 30, due_date=date(2026, 10, 18))],
+    )
+
+    assert len(Scheduler(Owner("Sam", pets=[pet]), day=today).generate_plan()) == 1
+
+
+def test_sort_by_time_handles_unpadded_hour() -> None:
+    """Sort unpadded preferred times chronologically."""
+    today = date(2026, 10, 21)
+    scheduler = Scheduler(Owner("Sam"), day=today)
+    tasks = [
+        Task("Ten", 5, preferred_time="10:00", due_date=today),
+        Task("Nine", 5, preferred_time="9:00", due_date=today),
+    ]
+
+    assert [task.title for task in scheduler.sort_by_time(tasks)] == ["Nine", "Ten"]
+
+
+def test_recurrence_handles_year_and_leap_day_boundaries() -> None:
+    """Advance daily and weekly recurrences across calendar boundaries."""
+    new_year = Task("Daily", 5, due_date=date(2026, 12, 31)).next_occurrence()
+    leap_day = Task("Leap", 5, due_date=date(2028, 2, 28)).next_occurrence()
+    next_week = Task("Weekly", 5, frequency="weekly", due_date=date(2026, 10, 28)).next_occurrence()
+
+    assert new_year is not None and new_year.due_date == date(2027, 1, 1)
+    assert leap_day is not None and leap_day.due_date == date(2028, 2, 29)
+    assert next_week is not None and next_week.due_date == date(2026, 11, 4)

@@ -84,6 +84,11 @@ improvements, then had it implement them one at a time: `sort_by_time()`, `filte
 recurring tasks using `timedelta` (`next_occurrence()` and `mark_task_complete()`), all-pairs conflict
 detection, and a midnight cutoff. Finally, I asked it how to simplify one of the algorithms.
 
+For testing, I started another new chat and asked Codex for a test plan: "What are the most important
+edge cases to test for a pet scheduler with sorting and recurring tasks?" It mapped which cases my
+existing tests already covered and listed the gaps. I then had it draft edge-case tests, and when one
+failed, I asked it whether the bug was in my test code or my `pawpal_system.py` logic.
+
 **b. Judgment and verification**
 
 - **Accepted:** Using owner.get_all_tasks() and the Pet from each (pet, task) pair for pet_name.
@@ -124,6 +129,18 @@ detection, and a midnight cutoff. Finally, I asked it how to simplify one of the
 - **Verified (Phase 4):** Codex said it added the tests but couldn't run pytest in its own environment, so I
   ran `python -m pytest -v` in my venv myself: all 22 tests passed. I also checked that every method named in
   the README table actually exists in `pawpal_system.py` and is in the right class.
+- **Test plan (Phase 5):** Codex correctly mapped my existing tests to its plan and suggested one case I
+  hadn't thought of: recurrence across month, year, and leap-day boundaries. I added it. But its plan missed
+  the case that actually exposed a bug (completing the same task twice), so I added that myself, along with
+  0 minutes available, an exact-fit task, overdue tasks, and three tasks at the same time.
+- **Debugging (Phase 5):** When the double-complete test failed, I asked Codex whether the bug was in the
+  test or my code. It said the logic was the problem: `mark_task_complete()` never checked whether the task
+  was already done. It also pointed out that the test encodes a design rule I chose. I agreed with that
+  rule, because a double-click in the app shouldn't create duplicate walks, so I fixed the code instead of
+  changing the test.
+- **Skipped (Phase 5):** Codex suggested testing invalid time strings like "8am" in the scheduler. That's true
+  (`to_minutes` would raise), but my UI already rejects bad times before they reach the scheduler, and
+  `test_bad_time_is_rejected_without_crashing` covers that, so I left it as a next step.
 
 ---
 
@@ -131,19 +148,24 @@ detection, and a midnight cutoff. Finally, I asked it how to simplify one of the
 
 **a. What you tested**
 
-I have 22 automated tests, all passing with `python -m pytest`.
+I have 35 automated tests, all passing with `python -m pytest`.
 
-Logic tests (`tests/test_pawpal.py`, 17 tests):
-- `mark_complete()` changes a task's status, and `add_task()` increases a pet's task count.
-- The scheduler pulls tasks from every pet through `Owner.get_all_tasks()`, not just one pet.
-- When time runs out, the scheduler keeps the high-priority task and skips the low-priority one.
-- `sort_by_time()` orders tasks by HH:MM and puts tasks with no time last.
-- `filter_tasks()` works by pet name, by completion status, and by both together.
-- Completing a daily task creates a copy due tomorrow; weekly is +7 days; "once" doesn't repeat.
-- Tomorrow's copy of a completed task is left out of today's plan but appears in tomorrow's.
-- Two tasks at the same time produce a warning, overlaps are found even between non-neighbouring
-  slots, and conflicts are labelled same pet / different pets.
-- Tasks (fixed or flexible) that would run past midnight are skipped with a reason.
+Logic tests (`tests/test_pawpal.py`, 30 tests):
+- **Core:** `mark_complete()` changes a task's status, `add_task()` increases a pet's task count, and the
+  scheduler pulls tasks from every pet through `Owner.get_all_tasks()`, not just one pet.
+- **Time budget:** when time runs out, the high-priority task wins and the low-priority one is skipped with a
+  reason; a task that exactly fills the budget still fits; with 0 minutes, everything is skipped.
+- **Sorting:** `sort_by_time()` is chronological, puts untimed tasks last, and handles "9:00" before "10:00";
+  generated plans come out in time order even when priority order is different.
+- **Filtering:** `filter_tasks()` works by pet name, by completion status, and by both together.
+- **Recurring tasks:** daily → tomorrow, weekly → +7 days, "once" doesn't repeat; dates roll over month, year,
+  and leap-day boundaries correctly; tomorrow's copy stays out of today's plan; overdue tasks are still
+  planned; completing the same task twice doesn't create a duplicate.
+- **Conflicts:** duplicate times are flagged for the same pet and for different pets; three tasks at the
+  same time give three warnings; overlaps between non-neighbouring slots are found; back-to-back tasks
+  (one ends at 08:30, the next starts at 08:30) are *not* conflicts.
+- **Edge cases:** an owner with no pets and a pet with no tasks both give an empty plan without errors;
+  tasks that would run past midnight are skipped; flexible tasks fill the gap before a fixed task.
 
 UI tests (`tests/test_app.py`, 5 tests using Streamlit's AppTest to click through the app):
 - Adding a pet creates a real `Pet` object that's still there after the app reruns.
@@ -155,25 +177,25 @@ UI tests (`tests/test_app.py`, 5 tests using Streamlit's AppTest to click throug
 
 These tests matter because they cover the core promises of the app: the right tasks get
 scheduled, the most important ones win when time is short, multiple pets work together, recurring
-tasks come back on the right day, and data entered in the browser actually reaches my classes and
-stays there. I also checked the terminal output of `main.py` by hand.
+tasks come back on the right day exactly once, and data entered in the browser actually reaches my
+classes and stays there. I also checked the terminal output of `main.py` by hand.
 
 **b. Confidence**
 
-I'm fairly confident in the main flow: picking tasks by priority within the time budget, placing
-fixed-time tasks, filling flexible ones into free gaps, sorting, filtering, and recurring tasks all
-work and are tested.
+**Confidence: 4/5.** I'm confident in the main flow: picking tasks by priority within the time budget,
+placing fixed-time tasks, filling flexible ones into free gaps, sorting, filtering, recurring tasks, and
+conflict detection all work and are tested, including the edge cases.
 
-Writing this section helped me find bugs. When I tried edge cases by hand, I found two real problems:
-`detect_conflicts()` only compared neighbouring slots (so a 60-minute walk at 08:00 overlapping both
-08:10 meds and 08:20 feeding only reported one conflict), and times weren't capped at midnight (a
-60-minute task at 23:30 showed as ending at "24:30"). I fixed both in Phase 4 and added tests for them.
+Testing found real bugs at every stage. While writing my first confidence section, I tried edge cases
+by hand and found that `detect_conflicts()` only compared neighbouring slots and that times weren't capped
+at midnight; I fixed both in Phase 4. In Phase 5, a new edge-case test failed: marking the same daily task
+complete twice created a second copy for tomorrow. The bug was in `mark_task_complete()`, which didn't check
+whether the task was already done. I added that check and all 35 tests passed.
 
-If I had more time, I'd test:
-- an owner with no pets, or pets with no tasks (empty plan)
-- an available time of 0 minutes
+I'm not at 5/5 because a few behaviors are untested or intentionally simple. If I had more time, I'd test:
+- a fixed-time task earlier than the owner's day start (currently allowed: meds at 07:00 still go at 07:00)
 - two tasks with the same title (`remove_task` only removes the first one)
-- a fixed-time task that is earlier than the owner's day start
+- invalid time strings passed straight to the scheduler (the UI blocks them, but `to_minutes` would raise)
 - marking a task complete from the Streamlit UI
 
 ---

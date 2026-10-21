@@ -124,6 +124,9 @@ class Scheduler:
 
     def mark_task_complete(self, pet: Pet, task: Task) -> Task | None:
         """Complete a task and add its next recurring occurrence when available."""
+        if task.completed:
+            # Avoid creating duplicate recurring occurrences.
+            return None
         task.mark_complete()
         next_task = task.next_occurrence()
         if next_task is not None:

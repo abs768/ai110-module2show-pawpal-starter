@@ -37,7 +37,7 @@ pip install -r requirements.txt
 ```bash
 python main.py          # CLI demo
 streamlit run app.py    # web app
-python -m pytest -v     # tests
+python -m pytest        # tests
 ```
 
 ### Suggested workflow
@@ -102,44 +102,44 @@ Conflict: 'Give meds' for Mochi (09:00-09:05) overlaps 'Vet call' for Mochi (09:
 
 ```bash
 # Run the full test suite (from the repo root, with .venv active):
-python -m pytest -v
+python -m pytest
 ```
 
-The suite has 22 tests: 17 logic tests in `tests/test_pawpal.py` (task completion, multi-pet scheduling,
-time budget, sorting, filtering, recurring tasks, conflicts, midnight cutoff) and 5 UI tests in
-`tests/test_app.py` that click through the Streamlit app with `AppTest`.
+The suite has 35 tests:
+
+- **`tests/test_pawpal.py` (30 logic tests)**
+  - *Core:* task completion, adding tasks, multi-pet scheduling, time budget (including exact fit and 0 minutes)
+  - *Sorting:* `sort_by_time()` is chronological (untimed last, "9:00" before "10:00"); generated plans come out in time order
+  - *Filtering:* by pet, by completion status, and both
+  - *Recurring:* daily → next day, weekly → +7 days, "once" doesn't repeat, month/year/leap-day rollover,
+    future copies stay out of today's plan, overdue tasks are still planned, and completing a task twice
+    doesn't create duplicates
+  - *Conflicts:* duplicate times for the same pet and for different pets are flagged, three tasks at one time give
+    three warnings, non-neighbouring overlaps are found, back-to-back tasks are *not* conflicts
+  - *Edge cases:* owner with no pets, pet with no tasks, tasks running past midnight, flexible tasks filling gaps
+- **`tests/test_app.py` (5 UI tests)** click through the Streamlit app with `AppTest`: adding pets and tasks,
+  rejecting duplicates and bad times, and generating a schedule with skip and conflict messages.
 
 Sample test output:
 
 ```
+============================= test session starts ==============================
 platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
-collected 22 items
+rootdir: /Users/bhavanishankar/ai110-module2show-pawpal-starter
+collected 35 items
 
-tests/test_app.py::test_add_pet_creates_pet_object_that_persists PASSED
-tests/test_app.py::test_duplicate_pet_name_is_rejected PASSED
-tests/test_app.py::test_add_task_goes_to_selected_pet PASSED
-tests/test_app.py::test_bad_time_is_rejected_without_crashing PASSED
-tests/test_app.py::test_generate_schedule_skips_and_warns PASSED
-tests/test_pawpal.py::test_mark_complete_changes_status PASSED
-tests/test_pawpal.py::test_add_task_increases_pet_task_count PASSED
-tests/test_pawpal.py::test_scheduler_uses_tasks_from_all_pets PASSED
-tests/test_pawpal.py::test_scheduler_skips_low_priority_when_out_of_time PASSED
-tests/test_pawpal.py::test_sort_by_time_places_untimed_tasks_last PASSED
-tests/test_pawpal.py::test_filter_tasks_by_pet_name PASSED
-tests/test_pawpal.py::test_filter_tasks_by_completed_status PASSED
-tests/test_pawpal.py::test_filter_tasks_by_pet_name_and_completed_status PASSED
-tests/test_pawpal.py::test_completing_daily_task_adds_next_occurrence PASSED
-tests/test_pawpal.py::test_weekly_next_occurrence_is_seven_days_later PASSED
-tests/test_pawpal.py::test_once_task_has_no_next_occurrence PASSED
-tests/test_pawpal.py::test_completed_daily_task_is_only_planned_on_tomorrow PASSED
-tests/test_pawpal.py::test_same_pet_overlapping_tasks_report_one_conflict PASSED
-tests/test_pawpal.py::test_conflict_detection_finds_all_overlaps PASSED
-tests/test_pawpal.py::test_task_that_runs_past_midnight_is_skipped PASSED
-tests/test_pawpal.py::test_fixed_task_that_runs_past_midnight_is_skipped PASSED
-tests/test_pawpal.py::test_conflict_between_different_pets_is_labeled PASSED
+tests/test_app.py .....                                                  [ 14%]
+tests/test_pawpal.py ..............................                      [100%]
 
-============================== 22 passed in 0.90s ==============================
+============================== 35 passed in 1.01s ==============================
 ```
+
+**Confidence level: ⭐⭐⭐⭐☆ (4/5)**
+All 35 tests pass, covering the happy paths and the edge cases I could think of, and writing them caught a real
+bug (completing a task twice created a duplicate next occurrence), which I fixed. I'm not giving 5 stars because
+some behavior is untested or intentionally simple: fixed-time tasks before the owner's day start are allowed,
+`remove_task` only removes the first task with a given title, owner preferences aren't used yet, and data isn't
+saved between browser sessions.
 
 ## Implementation Summary
 
@@ -160,7 +160,7 @@ and every button calls these same methods instead of duplicating the logic.
 | Task sorting | `Scheduler.sort_by_time()`, `Scheduler.sort_tasks()` | `sort_by_time` orders tasks by HH:MM (untimed tasks last); the planner ranks by priority, then preferred time, then shortest |
 | Filtering | `Scheduler.filter_tasks(pet_name, completed)`, `Owner.get_all_tasks(include_completed)` | Filter by pet, by done/pending, or both; tasks that don't fit the time budget or would run past midnight are skipped with a reason |
 | Conflict handling | `Scheduler.detect_conflicts()` | Sorts slots once, then compares each with every later slot that could overlap; labels `[same pet]` / `[different pets]` and returns warnings instead of crashing |
-| Recurring tasks | `Task.next_occurrence()`, `Scheduler.mark_task_complete()` | Completing a daily task adds a copy due tomorrow, a weekly one in 7 days (`timedelta`); future copies stay out of today's plan |
+| Recurring tasks | `Task.next_occurrence()`, `Scheduler.mark_task_complete()` | Completing a daily task adds a copy due tomorrow, a weekly one in 7 days (`timedelta`); future copies stay out of today's plan; completing a task twice doesn't create a duplicate |
 
 ## 📸 Demo Walkthrough
 

@@ -4,11 +4,13 @@
 Streamlit app that helps a pet owner plan daily pet care tasks. Logic lives in pawpal_system.py; UI in app.py;
 CLI demo in main.py; tests in tests/.
 
-## Current phase: Phase 4 — Smarter scheduling (done; update this section for the next phase)
-- Edit pawpal_system.py, main.py, tests/test_pawpal.py, README.md, reflection.md. Don't edit app.py unless I ask.
+## Current phase: Phase 5 — Testing and verification
+- Main file: tests/test_pawpal.py. Also allowed: README.md, reflection.md.
+- Only change pawpal_system.py to fix a bug a test exposes, and explain the bug first.
+- Tests use a fixed date (date(2026, 10, 21)) instead of date.today() so they don't depend on the clock.
+- Use keyword arguments for Task fields after duration (priority=, preferred_time=, due_date=).
 - Keep every existing method and signature working (the UI and the existing tests depend on them).
 - Scheduler must read tasks via Owner.get_all_tasks() (multi-pet), never from a single pet.
-- New Task fields go at the END of the dataclass so existing positional arguments don't shift.
 
 ## Rules that always apply
 - Classes: Owner, Pet, Task, ScheduledTask, Scheduler. Ask before adding new classes.
